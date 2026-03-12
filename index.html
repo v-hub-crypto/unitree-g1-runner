@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="x-ogp-key" content="YOUR_PLAYFUN_KEY_HERE"> <!-- из dashboard play.fun -->
+  <title>Unitree G1 Cyber Runner</title>
+  <style>
+    body { margin:0; background:#0a0a0a; overflow:hidden; }
+    canvas { display:block; margin:0 auto; }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="800" height="400"></canvas>
+
+  <script src="https://sdk.play.fun"></script>
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    class CyberRunner {
+      constructor() {
+        this.player = { x: 100, y: 280, velocity: 0, jumpsLeft: 2, isDucking: false };
+        this.score = 0; this.speed = 4.5; this.gravity = 0.85; this.groundY = 280;
+        this.frame = 0; this.gameOver = false;
+        this.obstacles = []; this.collectibles = [];
+        this.sdk = null;
+
+        this.backgroundImage = new Image();
+        this.backgroundImage.src = 'https://picsum.photos/id/1015/800/400'; // киберпанк (замени на свой)
+
+        this.runImage = new Image();
+        this.runImage.src = 'https://via.placeholder.com/400x100/00FF9F/000?text=G1+RUN+SPRITE'; // 4 кадра
+        this.frameWidth = 100;
+      }
+
+      async init() {
+        this.sdk = new OpenGameSDK({ ui: { usePointsWidget: true } });
+        await this.sdk.init({ gameId: 'unitree-g1-runner' });
+
+        setInterval(() => this.spawnObjects(), 1200);
+        this.gameLoop();
+      }
+
+      playSound(type) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if (type === 'jump') { osc.frequency.value = 680; gain.gain.value = 0.3; osc.type = 'sine'; }
+        else if (type === 'collect') { osc.frequency.value = 920; gain.gain.value = 0.4; }
+        else if (type === 'death') { osc.frequency.value = 180; gain.gain.value = 0.5; osc.type = 'sawtooth'; }
+        osc.start(); setTimeout(() => { osc.stop(); }, type === 'death' ? 600 : 120);
+      }
+
+      spawnObjects() {
+        const rand = Math.random();
+        if (rand > 0.55) this.obstacles.push({ type: 'ground', x: 800, y: this.groundY - 50, w: 45, h: 70 });
+        if (rand > 0.75) this.obstacles.push({ type: 'low', x: 800, y: this.groundY - 30, w: 50, h: 35 });
+        if (rand > 0.85) this.obstacles.push({ type: 'drone', x: 800, y: 140 + Math.random() * 80, w: 38, h: 32 });
+        if (rand > 0.65) this.collectibles.push({ x: 800, y: 120 + Math.random() * 140, w: 28, h: 28 });
+      }
+
+      handleInput(e) {
+        if ((e.key === ' ' || e.type === 'touchstart') && this.player.jumpsLeft > 0 && !this.gameOver) {
+          this.player.velocity = -17;
+          this.player.jumpsLeft--;
+          this.playSound('jump');
+        }
+        if (e.key === 'ArrowDown') this.player.isDucking = true;
+      }
+
+      update() {
+        if (this.gameOver) return;
+        this.frame++;
+
+        // Прыжок + двойной
+        if (this.player.velocity !== 0 || this.player.jumpsLeft < 2) {
+          this.player.velocity += this.gravity;
+          this.player.y += this.player.velocity;
+          if (this.player.y >= this.groundY) {
+            this.player.y = this.groundY;
+            this.player.velocity = 0;
+            this.player.jumpsLeft = 2;
+          }
+        }
+
+        // Объекты
+        this.obstacles.forEach((obs, i) => {
+          obs.x -= this.speed;
+          if (obs.x < -60) this.obstacles.splice(i, 1);
+          if (this.checkCollision(obs)) this.endGame();
+        });
+
+        this.collectibles.forEach((col, i) => {
+          col.x -= this.speed;
+          if (col.x < -40) this.collectibles.splice(i, 1);
+          if (this.checkCollision(col)) {
+            this.score += 80;
+            if (this.sdk) this.sdk.addPoints(80);
+            this.playSound('collect');
+            this.collectibles.splice(i, 1);
+          }
+        });
+
+        if (this.frame % 5 === 0 && this.sdk) this.sdk.addPoints(3);
+        this.score += 1;
+      }
+
+      checkCollision(obj) {
+        const playerHeight = this.player.isDucking ? 55 : 100;
+        const py = this.player.isDucking ? this.player.y + 45 : this.player.y;
+        return !(this.player.x + 70 < obj.x || this.player.x > obj.x + obj.w ||
+                 py + playerHeight < obj.y || py > obj.y + obj.h);
+      }
+
+      endGame() {
+        this.gameOver = true;
+        this.playSound('death');
+        if (this.sdk) this.sdk.endGame();
+      }
+
+      draw() {
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(this.backgroundImage, 0, 0, canvas.width, canvas.height);
+
+        // Робот G1 (анимация)
+        const frameX = (Math.floor(this.frame / 7) % 4) * this.frameWidth;
+        const drawY = this.player.isDucking ? this.player.y + 45 : this.player.y;
+        const drawH = this.player.isDucking ? 55 : 100;
+        ctx.drawImage(this.runImage, frameX, 0, this.frameWidth, this.runImage.height,
+                      this.player.x, drawY, 95, drawH);
+
+        // Препятствия
+        ctx.fillStyle = '#FF00FF';
+        this.obstacles.forEach(o => {
+          ctx.fillRect(o.x, o.y, o.w, o.h);
+          if (o.type === 'drone') ctx.fillStyle = '#00FFFF'; // цвет дронов
+        });
+
+        // Коллектиблы (SOL-кейсы)
+        ctx.fillStyle = '#00FF9F';
+        this.collectibles.forEach(c => ctx.fillRect(c.x, c.y, c.w, c.h));
+
+        // HUD
+        ctx.fillStyle = '#00FF9F';
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText(`DISTANCE ${Math.floor(this.score/8)}m`, 25, 45);
+      }
+
+      gameLoop() {
+        this.update();
+        this.draw();
+        requestAnimationFrame(() => this.gameLoop());
+      }
+    }
+
+    const game = new CyberRunner();
+    game.init();
+
+    document.addEventListener('keydown', e => game.handleInput(e));
+    document.addEventListener('keyup', e => { if (e.key === 'ArrowDown') game.player.isDucking = false; });
+    canvas.addEventListener('touchstart', e => game.handleInput(e));
+  </script>
+</body>
+</html>
