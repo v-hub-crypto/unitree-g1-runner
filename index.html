@@ -36,7 +36,7 @@
 
       async init() {
         this.sdk = new OpenGameSDK({ ui: { usePointsWidget: true } });
-        await this.sdk.init({ gameId: 'unitree-g1-runner' });
+        await this.sdk.init({ gameId: '490fd052-a2d3-43f8-989b-d10133cf7097' });
 
         setInterval(() => this.spawnObjects(), 1200);
         this.gameLoop();
