@@ -604,40 +604,288 @@ class CyberRunner {
       ctx.restore();
     }
 
-    const bx=hb.x,by=hb.y,bw=hb.w,bh=hb.h;
-    const A=B.accent,Bc='#1a2a4a',P='#243560';
-    const lp=this.player.duck?0:(this.frame/8)%(Math.PI*2);
+    // ── Unitree G1 — точные пропорции реального робота ──────────
+    // Цвета: белый корпус, чёрные шарниры, оранжевые акценты
+    const bx=hb.x, by=hb.y, bw=hb.w, bh=hb.h;
+    const lp = this.player.duck ? 0 : (this.frame/7)%(Math.PI*2);
+
+    // Пропорции (от реального G1: ~127см, длинные ноги, компактный торс)
+    const cx = bx + bw/2;
+    // секции по высоте
+    const headH  = bh * 0.13;
+    const neckH  = bh * 0.04;
+    const torsoH = bh * 0.26;
+    const waistH = bh * 0.05;
+    const hipH   = bh * 0.07;
+    const thighH = bh * 0.20;
+    const shinH  = bh * 0.18;
+    const footH  = bh * 0.07;
+
+    const headY  = by;
+    const neckY  = headY  + headH;
+    const torsoY = neckY  + neckH;
+    const waistY = torsoY + torsoH;
+    const hipY   = waistY + waistH;
+    const thighY = hipY   + hipH;
+    const kneeY  = thighY + thighH;
+    const footY  = kneeY  + shinH;
+
+    // Анимация бега: фазы для ног и рук
+    const run   = Math.sin(lp);
+    const runB  = Math.sin(lp + Math.PI);
+    const legSwing  = run  * 10;   // горизонтальное смещение голеней
+    const legSwingB = runB * 10;
+    const kneeAngle = Math.max(0, run)  * 8; // подъём колена
+    const kneeAngleB= Math.max(0, runB) * 8;
+
+    ctx.save();
 
     if(this.player.duck){
-      ctx.fillStyle=Bc;ctx.fillRect(bx+3,by+4,bw-6,bh-8);
-      ctx.fillStyle=P;ctx.fillRect(bx+7,by+8,bw-14,bh-16);
-      ctx.fillStyle=A;ctx.shadowColor=A;ctx.shadowBlur=8;
-      ctx.fillRect(bx+8,by+10,10,6);ctx.fillRect(bx+bw-18,by+10,10,6);
-      ctx.shadowBlur=0;return;
+      // ── DUCK: G1 приседает — торс вперёд, ноги согнуты ──────
+      const dby = by + bh*0.45; // нижняя точка приседа
+      const dtY = dby - bh*0.22;
+      // Торс наклонён
+      ctx.fillStyle='#e8e8e8';
+      ctx.beginPath();
+      ctx.moveTo(cx-bw*0.28, dtY+bh*0.22);
+      ctx.lineTo(cx+bw*0.28, dtY+bh*0.22);
+      ctx.lineTo(cx+bw*0.22, dtY);
+      ctx.lineTo(cx-bw*0.22, dtY);
+      ctx.closePath(); ctx.fill();
+      // Грудные пластины
+      ctx.fillStyle='#d0d0d0';
+      ctx.fillRect(cx-bw*0.2, dtY+2, bw*0.18, bh*0.1);
+      ctx.fillRect(cx+bw*0.02, dtY+2, bw*0.18, bh*0.1);
+      // Оранжевая полоска
+      ctx.fillStyle='#FF6600';ctx.shadowColor='#FF6600';ctx.shadowBlur=6;
+      ctx.fillRect(cx-bw*0.25, dtY+bh*0.12, bw*0.5, 3);
+      ctx.shadowBlur=0;
+      // Голова
+      ctx.fillStyle='#e8e8e8';
+      ctx.beginPath();ctx.ellipse(cx, dtY-bh*0.06, bw*0.18, bh*0.07, -0.3, 0, Math.PI*2);ctx.fill();
+      // Визор
+      ctx.fillStyle='#111';ctx.fillRect(cx-bw*0.14, dtY-bh*0.09, bw*0.28, bh*0.05);
+      ctx.fillStyle=B.accent;ctx.shadowColor=B.accent;ctx.shadowBlur=8;
+      ctx.fillRect(cx-bw*0.12, dtY-bh*0.085, bw*0.24, 3);ctx.shadowBlur=0;
+      // Согнутые ноги
+      ctx.fillStyle='#222'; // шарниры бёдер
+      ctx.beginPath();ctx.arc(cx-bw*0.14,dby-bh*0.06,bh*0.03,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cx+bw*0.14,dby-bh*0.06,bh*0.03,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#e8e8e8';
+      // Бёдра
+      ctx.fillRect(cx-bw*0.24,dby-bh*0.08,bw*0.2,bh*0.1);
+      ctx.fillRect(cx+bw*0.04,dby-bh*0.08,bw*0.2,bh*0.1);
+      // Голени (сильно согнуты)
+      ctx.fillStyle='#e8e8e8';
+      ctx.fillRect(cx-bw*0.22,dby,bw*0.18,bh*0.1);
+      ctx.fillRect(cx+bw*0.04,dby,bw*0.18,bh*0.1);
+      // Ступни
+      ctx.fillStyle='#111';
+      ctx.fillRect(cx-bw*0.26,dby+bh*0.09,bw*0.22,bh*0.04);
+      ctx.fillRect(cx+bw*0.04,dby+bh*0.09,bw*0.22,bh*0.04);
+      ctx.restore();
+      return;
     }
-    const tY=by+bh*.18,tH=bh*.38,lY=tY+tH,lH=bh*.36;
-    // Head
-    ctx.fillStyle=Bc;ctx.fillRect(bx+bw*.18,by,bw*.64,bh*.18);
-    ctx.fillStyle=P;ctx.fillRect(bx+bw*.24,by+3,bw*.52,bh*.12);
-    ctx.fillStyle=A;ctx.shadowColor=A;ctx.shadowBlur=10;
-    ctx.fillRect(bx+bw*.27,by+4,bw*.16,7);ctx.fillRect(bx+bw*.57,by+4,bw*.16,7);ctx.shadowBlur=0;
-    // Torso
-    ctx.fillStyle=Bc;ctx.fillRect(bx+5,tY,bw-10,tH);
-    ctx.fillStyle=P;ctx.fillRect(bx+9,tY+4,bw-18,tH-8);
-    ctx.strokeStyle=A;ctx.lineWidth=1;ctx.globalAlpha=.4;ctx.strokeRect(bx+11,tY+6,bw-22,tH-12);ctx.globalAlpha=1;
-    ctx.fillStyle='#00FFFF';ctx.shadowColor='#00FFFF';ctx.shadowBlur=10;
-    ctx.beginPath();ctx.arc(bx+bw/2,tY+tH/2,5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
-    // Arms
-    ctx.fillStyle=Bc;ctx.fillRect(bx,tY+4,5,tH*.5);ctx.fillRect(bx+bw-5,tY+4-Math.sin(lp)*6,5,tH*.5);
-    // Legs
-    const l1=Math.sin(lp)*13,l2=Math.sin(lp+Math.PI)*13;
-    ctx.fillStyle=Bc;
-    ctx.fillRect(bx+bw*.14,lY,bw*.25,lH*.55);ctx.fillRect(bx+bw*.14+l1*.3,lY+lH*.55,bw*.23,lH*.45);
-    ctx.fillRect(bx+bw*.60,lY,bw*.25,lH*.55);ctx.fillRect(bx+bw*.60+l2*.3,lY+lH*.55,bw*.23,lH*.45);
-    ctx.fillStyle='#0a1520';
-    ctx.fillRect(bx+bw*.11+l1*.3,lY+lH-5,bw*.3,8);ctx.fillRect(bx+bw*.57+l2*.3,lY+lH-5,bw*.3,8);
-    ctx.strokeStyle=A;ctx.lineWidth=1;ctx.globalAlpha=.35;
-    ctx.strokeRect(bx+bw*.16,lY+2,bw*.21,lH*.5);ctx.strokeRect(bx+bw*.62,lY+2,bw*.21,lH*.5);ctx.globalAlpha=1;
+
+    // ══════════════════════════════════════
+    //  FULL RUNNING G1
+    // ══════════════════════════════════════
+
+    // 1. НОГИ (рисуем первыми — под телом)
+    // Бедренные шарниры
+    const hipLx = cx - bw*0.14;
+    const hipRx = cx + bw*0.14;
+
+    // Левая нога (фаза A)
+    // Бедро
+    ctx.fillStyle='#e8e8e8';
+    ctx.beginPath();
+    ctx.roundRect(hipLx-bw*0.1, thighY-kneeAngle, bw*0.19, thighH, 3);
+    ctx.fill();
+    // Шарнир колена
+    ctx.fillStyle='#222';
+    ctx.beginPath();ctx.arc(hipLx-bw*0.01, kneeY-kneeAngle, bh*0.028, 0, Math.PI*2);ctx.fill();
+    // Голень (отклоняется назад при беге)
+    ctx.fillStyle='#e8e8e8';
+    ctx.save();
+    ctx.translate(hipLx-bw*0.01, kneeY-kneeAngle);
+    ctx.rotate(-legSwing*0.04);
+    ctx.fillRect(-bw*0.085, 0, bw*0.17, shinH);
+    ctx.restore();
+    // Ступня левая
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath();
+    ctx.roundRect(hipLx-bw*0.16+legSwing*0.3, footY-kneeAngle+2, bw*0.28, footH, 2);
+    ctx.fill();
+    // Оранжевый акцент на голени
+    ctx.fillStyle='#FF6600';
+    ctx.fillRect(hipLx-bw*0.07, kneeY-kneeAngle+shinH*0.3, bw*0.13, 2);
+
+    // Правая нога (фаза B)
+    ctx.fillStyle='#e8e8e8';
+    ctx.beginPath();
+    ctx.roundRect(hipRx-bw*0.09, thighY-kneeAngleB, bw*0.19, thighH, 3);
+    ctx.fill();
+    // Шарнир колена
+    ctx.fillStyle='#222';
+    ctx.beginPath();ctx.arc(hipRx+bw*0.01, kneeY-kneeAngleB, bh*0.028, 0, Math.PI*2);ctx.fill();
+    // Голень правая
+    ctx.fillStyle='#e8e8e8';
+    ctx.save();
+    ctx.translate(hipRx+bw*0.01, kneeY-kneeAngleB);
+    ctx.rotate(-legSwingB*0.04);
+    ctx.fillRect(-bw*0.085, 0, bw*0.17, shinH);
+    ctx.restore();
+    // Ступня правая
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath();
+    ctx.roundRect(hipRx-bw*0.08+legSwingB*0.3, footY-kneeAngleB+2, bw*0.28, footH, 2);
+    ctx.fill();
+    ctx.fillStyle='#FF6600';
+    ctx.fillRect(hipRx-bw*0.06, kneeY-kneeAngleB+shinH*0.3, bw*0.13, 2);
+
+    // Бедренные шарниры (круглые, тёмные)
+    ctx.fillStyle='#2a2a2a';
+    ctx.beginPath();ctx.arc(hipLx, thighY, bh*0.038, 0, Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(hipRx, thighY, bh*0.038, 0, Math.PI*2);ctx.fill();
+
+    // 2. ПОЯС (тонкий шарнир — характерно для G1)
+    ctx.fillStyle='#333';
+    ctx.beginPath();
+    ctx.ellipse(cx, waistY+waistH/2, bw*0.18, waistH/2+1, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Горизонтальный шарнир пояса
+    ctx.fillStyle='#444';
+    ctx.fillRect(cx-bw*0.22, waistY+1, bw*0.44, waistH-2);
+    ctx.fillStyle='#FF6600';ctx.shadowColor='#FF6600';ctx.shadowBlur=5;
+    ctx.fillRect(cx-bw*0.14, waistY+waistH*0.35, bw*0.28, 2);
+    ctx.shadowBlur=0;
+
+    // 3. ТОРС
+    // Основа торса — белый, слегка трапециевидный
+    ctx.fillStyle='#e8e8e8';
+    ctx.beginPath();
+    ctx.moveTo(cx-bw*0.30, torsoY+torsoH);
+    ctx.lineTo(cx+bw*0.30, torsoY+torsoH);
+    ctx.lineTo(cx+bw*0.25, torsoY);
+    ctx.lineTo(cx-bw*0.25, torsoY);
+    ctx.closePath();ctx.fill();
+    // Разделительная линия грудных пластин (V-образно, как на G1)
+    ctx.strokeStyle='#bbb';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx, torsoY+2);ctx.lineTo(cx-bw*0.06, torsoY+torsoH*0.55);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx, torsoY+2);ctx.lineTo(cx+bw*0.06, torsoY+torsoH*0.55);ctx.stroke();
+    // Серединный блок (логотип / корпус)
+    ctx.fillStyle='#d5d5d5';
+    ctx.fillRect(cx-bw*0.12, torsoY+torsoH*0.55, bw*0.24, torsoH*0.35);
+    // Светящийся центральный датчик (как у реального G1 — круглый фронтальный сенсор)
+    ctx.fillStyle=B.accent;ctx.shadowColor=B.accent;ctx.shadowBlur=12;
+    ctx.beginPath();ctx.arc(cx, torsoY+torsoH*0.38, bh*0.028, 0, Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.shadowBlur=4;
+    ctx.beginPath();ctx.arc(cx, torsoY+torsoH*0.38, bh*0.012, 0, Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    // Оранжевая полоса по низу торса (характерная деталь G1)
+    ctx.fillStyle='#FF6600';ctx.shadowColor='#FF6600';ctx.shadowBlur=6;
+    ctx.fillRect(cx-bw*0.26, torsoY+torsoH-4, bw*0.52, 4);
+    ctx.shadowBlur=0;
+    // Боковые рёбра жёсткости
+    ctx.strokeStyle='#ccc';ctx.lineWidth=1;
+    ctx.strokeRect(cx-bw*0.22, torsoY+6, bw*0.12, torsoH-14);
+    ctx.strokeRect(cx+bw*0.1,  torsoY+6, bw*0.12, torsoH-14);
+
+    // 4. РУКИ
+    // Плечевые шарниры (большие круглые — фишка G1)
+    const shoulderLx = cx - bw*0.33;
+    const shoulderRx = cx + bw*0.33;
+    const shoulderY  = torsoY + torsoH*0.08;
+
+    ctx.fillStyle='#2a2a2a';
+    ctx.beginPath();ctx.arc(shoulderLx, shoulderY, bh*0.04, 0, Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(shoulderRx, shoulderY, bh*0.04, 0, Math.PI*2);ctx.fill();
+    ctx.fillStyle='#444';
+    ctx.beginPath();ctx.arc(shoulderLx, shoulderY, bh*0.025, 0, Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(shoulderRx, shoulderY, bh*0.025, 0, Math.PI*2);ctx.fill();
+
+    // Плечо-предплечье левое (качается противофазно ноге)
+    const armSwingL = runB * 8;
+    const armSwingR = run  * 8;
+    const elbowY = shoulderY + torsoH*0.6;
+
+    ctx.fillStyle='#e8e8e8';
+    // Верхняя часть руки (плечо)
+    ctx.save();
+    ctx.translate(shoulderLx, shoulderY);
+    ctx.rotate(armSwingL*0.04);
+    ctx.beginPath();ctx.roundRect(-bw*0.075, 0, bw*0.14, torsoH*0.55, 3);ctx.fill();
+    // Шарнир локтя
+    ctx.fillStyle='#2a2a2a';
+    ctx.beginPath();ctx.arc(0, torsoH*0.55, bh*0.022, 0, Math.PI*2);ctx.fill();
+    // Предплечье
+    ctx.fillStyle='#e0e0e0';
+    ctx.beginPath();ctx.roundRect(-bw*0.06, torsoH*0.55, bw*0.11, torsoH*0.5, 3);ctx.fill();
+    // Кисть (3 пальца — характерно для G1)
+    ctx.fillStyle='#333';
+    ctx.beginPath();ctx.arc(0, torsoH*0.55+torsoH*0.5, bh*0.022, 0, Math.PI*2);ctx.fill();
+    // 3 пальца
+    ctx.fillStyle='#555';
+    for(let f=-1;f<=1;f++){
+      ctx.fillRect(f*bw*0.035-bw*0.015, torsoH*1.06, bw*0.028, bh*0.05);
+    }
+    ctx.restore();
+
+    // Правая рука
+    ctx.fillStyle='#e8e8e8';
+    ctx.save();
+    ctx.translate(shoulderRx, shoulderY);
+    ctx.rotate(-armSwingR*0.04);
+    ctx.beginPath();ctx.roundRect(-bw*0.065, 0, bw*0.14, torsoH*0.55, 3);ctx.fill();
+    ctx.fillStyle='#2a2a2a';
+    ctx.beginPath();ctx.arc(0, torsoH*0.55, bh*0.022, 0, Math.PI*2);ctx.fill();
+    ctx.fillStyle='#e0e0e0';
+    ctx.beginPath();ctx.roundRect(-bw*0.05, torsoH*0.55, bw*0.11, torsoH*0.5, 3);ctx.fill();
+    ctx.fillStyle='#333';
+    ctx.beginPath();ctx.arc(0, torsoH*1.05, bh*0.022, 0, Math.PI*2);ctx.fill();
+    ctx.fillStyle='#555';
+    for(let f=-1;f<=1;f++){
+      ctx.fillRect(f*bw*0.035-bw*0.015, torsoH*1.06, bw*0.028, bh*0.05);
+    }
+    ctx.restore();
+
+    // 5. ШЕЯ
+    ctx.fillStyle='#333';
+    ctx.fillRect(cx-bw*0.08, neckY, bw*0.16, neckH+2);
+
+    // 6. ГОЛОВА (маленькая, округлая, с широким горизонтальным визором)
+    // Основа
+    ctx.fillStyle='#e8e8e8';
+    ctx.beginPath();
+    ctx.roundRect(cx-bw*0.22, headY, bw*0.44, headH, [bh*0.02, bh*0.02, bh*0.01, bh*0.01]);
+    ctx.fill();
+    // Боковые грани (темнее)
+    ctx.fillStyle='#d0d0d0';
+    ctx.fillRect(cx-bw*0.22, headY+2, bw*0.04, headH-4);
+    ctx.fillRect(cx+bw*0.18, headY+2, bw*0.04, headH-4);
+    // Визор — широкая горизонтальная полоса (#ключевая черта G1)
+    ctx.fillStyle='#0a0a0f';
+    ctx.beginPath();
+    ctx.roundRect(cx-bw*0.19, headY+headH*0.2, bw*0.38, headH*0.45, 3);
+    ctx.fill();
+    // Свечение визора (цвет биома)
+    ctx.fillStyle=B.accent;ctx.shadowColor=B.accent;ctx.shadowBlur=14;
+    ctx.fillRect(cx-bw*0.17, headY+headH*0.28, bw*0.34, headH*0.28);
+    // Блики на визоре
+    ctx.fillStyle='rgba(255,255,255,0.15)';ctx.shadowBlur=0;
+    ctx.fillRect(cx-bw*0.16, headY+headH*0.29, bw*0.12, headH*0.1);
+    // Нижняя полоска головы
+    ctx.fillStyle='#FF6600';ctx.shadowColor='#FF6600';ctx.shadowBlur=5;
+    ctx.fillRect(cx-bw*0.18, headY+headH*0.78, bw*0.36, 2);
+    ctx.shadowBlur=0;
+    // Верхушка (характерный "гребень")
+    ctx.fillStyle='#d8d8d8';
+    ctx.beginPath();
+    ctx.roundRect(cx-bw*0.1, headY-bh*0.01, bw*0.2, bh*0.015, 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 
   _drawBoss(){
