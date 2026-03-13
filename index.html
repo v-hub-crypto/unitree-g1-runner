@@ -12,7 +12,7 @@
 </head>
 <body>
 <canvas id="game" width="800" height="400"></canvas>
-<script src="https://sdk.play.fun"></script>
+<script src="https://sdk.play.fun" id="sdk-script"></script>
 <script>
 const canvas = document.getElementById('game');
 const ctx    = canvas.getContext('2d');
@@ -299,9 +299,26 @@ class CyberRunner {
   get biome(){ return BIOMES[BIOME_ORDER[this.biomeIdx]]; }
 
   async init(){
-    try{this.sdk=new OpenGameSDK({ui:{usePointsWidget:true}});await this.sdk.init({gameId:'490fd052-a2d3-43f8-989b-d10133cf7097'});}catch(e){this.sdk=null;}
+    // Play.fun SDK — инициализация
+    try {
+      this.sdk = new OpenGameSDK({ ui: { usePointsWidget: true } });
+      await this.sdk.init({ gameId: '490fd052-a2d3-43f8-989b-d10133cf7097' });
+      console.log('[SDK] OK');
+    } catch(e) {
+      console.warn('[SDK] init failed:', e);
+      this.sdk = null;
+    }
     this._spawnLoop();
     this._loop();
+  }
+
+  _pts(n){
+    if(!this.sdk) return;
+    try { this.sdk.addPoints(n); } catch(e) { console.warn('[SDK] addPoints:', e); }
+  }
+  _endGame(){
+    if(!this.sdk) return;
+    try { this.sdk.endGame(); } catch(e) { console.warn('[SDK] endGame:', e); }
   }
 
   // ── SPAWN ──────────────────────────────────────────
@@ -431,7 +448,7 @@ class CyberRunner {
         }else{
           this.combo++;this.comboT=110;
           const m=this._mult(),pts=Math.round(80*m);
-          this.score+=pts;if(this.sdk)this.sdk.addPoints(pts);
+          this.score+=pts;this._pts(pts);
           snd(this.combo>=3?'combo':'collect');
           this.fx.emit(c.x+c.w/2,c.y+c.h/2,'collect',[this.biome.accent,'#FFD700']);
           if(this.combo>=3)this.fx.emit(hb.x+hb.w/2,hb.y,'combo');
@@ -441,7 +458,7 @@ class CyberRunner {
       }
     }
 
-    if(this.frame%5===0&&this.sdk)this.sdk.addPoints(3);
+    if(this.frame%5===0) this._pts(3);
     this.score+=1;
     this.speed=4.5+Math.floor(this.score/500)*.22;
 
@@ -528,7 +545,7 @@ class CyberRunner {
     this.fx.emit(this.bossX+40,this._bossY+35,'death');
     snd('boss',1.4);
     const bonus=500+Math.floor(this.score/1000)*200;
-    this.score+=bonus;if(this.sdk)this.sdk.addPoints(bonus);
+    this.score+=bonus;this._pts(bonus);
     this.bossActive=false;
     // Показ бонуса
     this.cpop={text:`BOSS DEFEATED! +${bonus}`,al:2.5,y:hb.y-30};
@@ -538,7 +555,7 @@ class CyberRunner {
     this.state='dead';this.deathFlash=14;
     snd('death');
     const hb=this._hb();this.fx.emit(hb.x+hb.w/2,hb.y+hb.h/2,'death');
-    if(this.sdk)this.sdk.endGame();
+    this._endGame();
     const dist=Math.floor(this.score/8);
     this.newRecordPos=LB.add(dist);
   }
@@ -1055,14 +1072,21 @@ class CyberRunner {
 }
 
 // ── Bootstrap ─────────────────────────────────────────
-const game=new CyberRunner();
-game.init();
-document.addEventListener('keydown',e=>{
-  if([' ','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();
-  game.handleInput(e);
-});
-document.addEventListener('keyup',e=>{if(e.key==='ArrowDown')game.player.duck=false;});
-canvas.addEventListener('touchstart',e=>{e.preventDefault();game.handleInput(e);},{passive:false});
+// Ждём загрузки SDK, потом запускаем игру
+function startGame() {
+  const game = new CyberRunner();
+  game.init();
+  document.addEventListener('keydown', e => {
+    if([' ','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault();
+    game.handleInput(e);
+  });
+  document.addEventListener('keyup', e => { if(e.key==='ArrowDown') game.player.duck=false; });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); game.handleInput(e); }, {passive:false});
+}
+
+// Запускаем сразу — SDK либо уже загружен синхронно, либо подхватится в init()
+startGame();
+
 </script>
 </body>
 </html>
